@@ -1,0 +1,224 @@
+---
+title: "Data visualization from a QFeatures object"
+author:
+- name: Laurent Gatto
+package: QFeatures
+abstract: >
+  This vignette describes how to visualize quantitative mass
+  spectrometry data contained in a QFeatures object. 
+output:
+  BiocStyle::html_document:
+    toc_float: true
+bibliography: QFeatures.bib
+vignette: >
+  %\VignetteIndexEntry{Data visualization from a QFeatures object}
+  %\VignetteEngine{knitr::rmarkdown}
+  %%\VignetteKeywords{Mass Spectrometry, MS, MSMS, Proteomics, Metabolomics, Infrastructure, Quantitative}
+  %\VignetteEncoding{UTF-8}
+---
+
+## Preparing the data
+
+To demonstrate the data visualization of a `QFeatures`, we first 
+perform a quick processing of the `hlpsms` example data. We load the 
+data and read it as a `QFeautres` object. See the processing 
+[vignette](https://rformassspectrometry.github.io/QFeatures/articles/Processing.html)
+for more details about data processing with `QFeatures`. 
+
+```{r read_data, message = FALSE}
+library("QFeatures")
+data(hlpsms)
+hl <- readQFeatures(hlpsms, ecol = 1:10, name = "psms")
+```
+
+We then aggregate the psms to peptides, and the peptodes to proteins. 
+
+```{r aggregateFeatures}
+hl <- aggregateFeatures(hl, "psms", "Sequence", name = "peptides", fun = colMeans)
+hl <- aggregateFeatures(hl, "peptides", "ProteinGroupAccessions", name = "proteins", fun = colMeans)
+```
+
+We also add the TMT tags that were used to multiplex the samples. The
+data is added to the `colData` of the `QFeatures` object and will 
+allow us to demonstrate how to plot data from the `colData`. 
+
+```{r add_TMT_info}
+hl$tag <- c("126", "127N", "127C", "128N", "128C", "129N", "129C",
+            "130N", "130C", "131")
+```
+
+The dataset is now ready for data exploration.  
+
+# Exploring the `QFeatures` hierarchy
+
+`QFeatures` objects can contain several assays as the data goes through
+the processing workflow. The `plot` function provides an overview of 
+all the assays present in the dataset, showing also the hierarchical 
+relationships between the assays as determined by the `AssayLinks`. 
+
+```{r plot, out.width="125px"}
+plot(hl)
+```
+
+Note that some datasets may contain many assays, for instance because
+the MS experiment consists of hundreds of batches. This can lead to an
+overcrowded plot. Therefore, you can also explore this hierarchy of 
+assays through an interactive plot, supported by the `plotly` package
+(@Sievert2020). You can use the viewer panel to zoom in and out and
+navigate across the tree(s). 
+
+```{r plot_interactive, eval = FALSE}
+plot(hl, interactive = TRUE)
+```
+
+
+# Basic data exploration
+
+The quantitative data is retrieved using `assay()`, the feature 
+metadata is retrieved using `rowData()` on the assay of interest, and 
+the sample metadata is retrieved using `colData()`. Once retrieved, 
+the data can be supplied to the base R data exploration tools. Here 
+are some examples: 
+
+- Plot the intensities for the first protein. These data are available 
+  from the `proteins` assay.
+
+```{r plot_assay}
+plot(assay(hl, "proteins")[1, ])
+```
+
+- Get the distribution of the number of peptides that were aggregated
+  per protein. These data are available in the column `.n` from the 
+  protein `rowData`. 
+
+```{r hist_rowData}
+hist(rowData(hl)[["proteins"]]$.n)
+```
+
+- Get the count table of the different tags used for labeling the
+  samples. These data are available in the column `tag` from the 
+  `colData`. 
+
+```{r table_tag}
+table(hl$tag)
+```
+
+## Using `ggplot2`
+
+`ggplot2` is a powerful tool for data visualization in `R` and is part
+of the `tidyverse` package ecosystem (@Wickham2019-fz). It produces
+elegant and publication-ready plots in a few lines of code. `ggplot2`
+can be used to explore `QFeatures` object, similarly to the base
+functions shown above. Note that `ggplot2` expects `data.frame` or
+`tibble` objects whereas the quantitative data in `QFeatures` are
+encoded as `matrix` (or matrix-like objects, see 
+`?SummarizedExperiment`) and the `rowData` and `colData` are encoded 
+as `DataFrame`. This is easily circumvented by converting those 
+objects to `data.frame`s or `tibble`s. See here how we reproduce the 
+plot above using `ggplot2`. 
+
+```{r ggplot_rowData, message = FALSE}
+library("ggplot2")
+df <- data.frame(rowData(hl)[["proteins"]])
+ggplot(df) +
+    aes(x = .n) +
+    geom_histogram()
+```
+
+We refer the reader to the `ggplot2` 
+[package website](https://ggplot2.tidyverse.org/) for more information
+about the wide variety of functions that the package offers and for 
+tutorials and cheatsheets.
+
+Another useful package for quantitative data exploration is 
+`ComplexHeatmap` (@Gu2016-ej). It is part of the Bioconductor project
+(@Gentleman:2004) and facilitates visualization of matrix objects as 
+heatmap. See here an example where we plot the protein data. 
+
+```{r ComplexHeatmap, message = FALSE}
+library(ComplexHeatmap)
+Heatmap(matrix = assay(hl, "proteins"), 
+        show_row_names = FALSE)
+```
+
+`ComplexHeatmap` also allows to add row and/or column annotations. 
+Let's add the predicted protein location as row annotation. 
+
+```{r ComplexHeatmap_annotations}
+ha <- rowAnnotation(markers = rowData(hl)[["proteins"]]$markers)
+Heatmap(matrix = assay(hl, "proteins"),
+        show_row_names = FALSE,
+        left_annotation = ha)
+```
+
+More advanced usage of `ComplexHeatmap` is described in the package
+reference [book](https://jokergoo.github.io/ComplexHeatmap-reference/book/).
+
+# Advanced data exploration
+
+In this section, we show how to combine in a single table 
+different pieces of information available in a `QFeatures` object, 
+that are quantitation data, feature metadata and sample metadata. The
+`QFeatures` package provides the `longFormat` function that converts a
+`QFeatures` object into a long table. Long tables are very useful when
+using `ggplot2` for data visualization. For instance, suppose we want
+to visualize the distribution of protein quantitation (present in the
+`proteins` assay) with respect to the different acquisition tags
+(present in the `colData`) for each predicted cell location separately
+(present in the `rowData` of the assays). Furthermore, we link the
+quantitation values coming from the same protein using lines. This can
+all be plotted at once in a few lines of code.
+
+```{r longFormat, fig.height = 7, fig.width = 9}
+lf <- longFormat(hl[, , "proteins"],
+                 rowvars = "markers",
+                 colvars = "tag")
+ggplot(data.frame(lf)) +
+    aes(x = tag, 
+        y = value,
+        group = rowname) +
+    geom_line() +
+    facet_wrap(~ markers, scales = "free_y", ncol = 3)
+```
+
+`longFormat` allows to retrieve and combine all available data from a
+`Qfeatures` object. We here demonstrate the ease to combine different
+pieces that could highlight sample specific and/or feature specific 
+effects on data quantitation. 
+
+# Interactive data exploration
+
+Finally, a simply `shiny` app allows to explore and visualise the
+respective assays of a `QFeatures` object.
+
+```{r display, eval = FALSE}
+display(hl)
+```
+
+```{r heatmapdisplay, results='markup', fig.cap="`QFeatures` interactive interface: heatmap of the peptide assay data.", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
+knitr::include_graphics("./figs/display_hmap.png", error = FALSE)
+```
+
+```{r assaydisplay, results='markup', fig.cap="`QFeatures` interactive interface: quantitative peptide assay data.", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
+knitr::include_graphics("./figs/display_assay.png", error = FALSE)
+```
+```{r rowdatadisplay, results='markup', fig.cap="`QFeatures` interactive interface: peptide assay row data", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
+knitr::include_graphics("./figs/display_rowdata.png", error = FALSE)
+```
+
+A dropdown menu in the side bar allows the user to select an assay of
+interest, which can then be visualised as a heatmap (figure
+\@ref(fig:heatmapdisplay)), as a quantitative table (figure
+\@ref(fig:assaydisplay)) or a row data table (figure
+\@ref(fig:rowdatadisplay)).
+
+
+# Session information {-}
+
+```{r sessioninfo, echo=FALSE}
+sessionInfo()
+```
+
+
+# References {-}
+

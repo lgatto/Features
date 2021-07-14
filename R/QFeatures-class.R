@@ -102,6 +102,12 @@
 ##'   `rowvars` isn't found in any `rowData` variable, a message is
 ##'   printed.
 ##'
+##' @param object An instance of class [QFeatures].
+##' 
+##' @param x An instance of class [QFeatures].
+##' 
+##' @param y A single assay or a *named* list of assays. 
+##' 
 ##' @param i `character()`, `integer()`, `logical()` or `GRanges()`
 ##'     object for subsetting by rows.
 ##'
@@ -113,6 +119,9 @@
 ##'
 ##' @param drop logical (default `TRUE`) whether to drop empty assay
 ##'     elements in the `ExperimentList`.
+##'
+##' @param ... See `MultiAssayExperiment` for details. For `plot`, 
+##'     further arguments passed to `igraph::plot.igraph`.
 ##'
 ##'
 ##' @return See individual method description for the return value.
@@ -224,7 +233,7 @@ setClass("QFeatures",
 
 
 ##' @rdname QFeatures-class
-##' @param object An instance of class `QFeatures`.
+##' 
 ##' @exportMethod show
 setMethod("show", "QFeatures",
           function(object) {
@@ -259,6 +268,103 @@ setMethod("show", "QFeatures",
                               featdim[(n-2):n], sampdim[(n-2):n]), "\n")
               }
           })
+
+
+## Function that creates a plotly network graph from an igraph object
+## @param graph An i graph object.
+## @param coords A n vertices by 2 matrix with the coordinates of the 
+##     nodes.
+##' @importFrom igraph get.edgelist layout_as_tree plot.igraph add_edges
+##' @importFrom grDevices rgb
+##' 
+.plotlyGraph <- function(graph, coords) {
+    stopifnot(inherits(graph, "igraph"))
+    ## Initialize plotly
+    pl <- plotly::plot_ly()
+    ## Add edges
+    el <- get.edgelist(graph)
+    edge_coords <- sapply(1:nrow(el), function(i) {
+        edge_coord <- c(coords[el[i, 1], 1],
+                        coords[el[i, 1], 2],
+                        coords[el[i, 2], 1],
+                        coords[el[i, 2], 2])
+    })
+    pl <- plotly::add_segments(pl, 
+                               x = edge_coords[1, ],
+                               y = edge_coords[2, ],
+                               xend = edge_coords[3, ],
+                               yend = edge_coords[4, ],
+                               line = list(color = "grey", width = 0.3,
+                                           showarrow = TRUE))
+    ## Add nodes
+    pl <- plotly::add_markers(pl,
+                              x = coords[, 1], y = coords[, 2], 
+                              marker = list(color = rgb(0.8, 0.8, 0.8),
+                                            size = 40),
+                              text = names(V(graph)), 
+                              hoverinfo = "text")
+    ## Add labels
+    pl <- plotly::add_text(pl,
+                           x = coords[, 1], y = coords[, 2], 
+                           hoverinfo = "text",
+                           text = names(V(graph)))
+    
+    ## Edit plot plot
+    axis <- list(title = "", showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE)
+    plotly::layout(pl,
+                   xaxis = axis,
+                   yaxis = axis,
+                   showlegend = FALSE)
+}
+
+##' @rdname QFeatures-class
+##' 
+##' @param interactive A `logical(1)`. If `TRUE`, an interactive graph
+##'     is generated using `plotly`. Else, a static plot using `igraph`
+##'     is generated. We recommend interactive exploration when the
+##'     `QFeatures` object contains more than 50 assays.
+##' 
+##' @importFrom igraph make_graph layout_as_tree plot.igraph add_edges V
+##' @export
+plot.QFeatures <- function (x, interactive = FALSE, ...) {
+    ## Check arguments
+    if (!interactive & length(x) > 50) 
+        warning("The QFeatures object contains many assays. You may ",
+                "want to consider creating an interactive plot (set ",
+                "'interactive = TRUE')")
+    ## Create the network graph
+    graph <- make_graph(edges = character(0), 
+                                isolates = names(x))
+    ## Add the edges = links between assays
+    roots <- c()
+    for (child in names(x)) {
+        parents <- assayLink(x, child)@from
+        for(parent in parents) {
+            if (!is.na(parent)) {
+                graph <- add_edges(graph, c(parent, child))
+            } else {
+                roots <- c(roots, child)
+            }
+        }
+    }
+    ## Tree layout
+    coords <- layout_as_tree(graph, root = roots)
+    rownames(coords) <- names(V(graph))
+    ## Add an interleaved offset on the y coord for better rendering 
+    ## when many assays have to be drawn
+    interleaved <- c(seq(1, 5, 2), seq(2, 6, 2))
+    offset <- rep_len(interleaved * 0.05 * max(coords[, 2]), 
+                       length.out = nrow(coords))
+    coords[, 2] <- coords[, 2] + offset
+    ## Perform plotting 
+    if (!interactive) {
+        plot.igraph(graph, layout = coords, ...)
+        return(invisible(NULL))
+    } else {
+        return(.plotlyGraph(graph, coords))
+    }
+}
+
 
 ## Function that prunes a `Hits` object from an `AssayLink` object, 
 ## making sure that the `Hits` object is still valid with respect to 
@@ -337,8 +443,9 @@ setMethod("show", "QFeatures",
 }
 
 ##' @rdname QFeatures-class
-##' @param x An instance of class `QFeatures`.
+##' 
 ##' @importFrom methods callNextMethod
+##' 
 ##' @exportMethod [
 setMethod("[", c("QFeatures", "ANY", "ANY", "ANY"),
           function(x, i, j, ..., drop = TRUE) {
@@ -440,7 +547,6 @@ rbindRowData <- function(object, i)  {
 
 ##' @rdname QFeatures-class
 ##'
-##' @param x An instance of class `QFeatures`.
 ##' @param rowvars A `character()` with the names of the `rowData`
 ##'     variables (columns) to retain in any assay.
 ##'
@@ -538,4 +644,35 @@ longFormat <- function(object,
         ## If rowvars is null, return the MAE longFormat output
         MultiAssayExperiment::longFormat(object, colvars, index)
     }
+}
+
+
+##' @param name A `character(1)` naming the single assay (default is
+##'     `"newAssay"`). Ignored if `y` is a list of assays.
+##' @param assayLinks An optional [AssayLinks].
+##'
+##' @md
+##'
+##' @rdname QFeatures-class
+##'
+##' @export
+addAssay <- function(x,
+                     y,
+                     name = "newAssay",
+                     assayLinks = AssayLinks(names = name)) {
+    stopifnot(inherits(x, "QFeatures"))
+    el0 <- x@ExperimentList@listData
+    if (is.list(y)) el1 <- y
+    else el1 <- structure(list(y), .Names = name[1])
+    el <- ExperimentList(c(el0, el1))
+    smap <- MultiAssayExperiment:::.sampleMapFromData(colData(x), el)
+    if (inherits(assayLinks, "AssayLink"))
+        assayLinks <- AssayLinks(assayLinks)
+    new("QFeatures",
+        ExperimentList = el,
+        colData = colData(x),
+        sampleMap = smap,
+        metadata = metadata(x),
+        assayLinks = append(x@assayLinks,
+                            assayLinks))
 }

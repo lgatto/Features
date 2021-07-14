@@ -29,6 +29,8 @@ Imports:
    lazyeval,
    Biobase,
    MsCoreUtils (>= 1.1.2),
+   igraph,
+   plotly
 Suggests:
    SingleCellExperiment,
    HDF5Array,
@@ -51,7 +53,9 @@ Suggests:
    imputeLCMD,
    pcaMethods,
    impute,
-   norm
+   norm,
+   ComplexHeatmap,
+   vdiffr
 biocViews: Infrastructure, MassSpectrometry, Proteomics, Metabolomics
 License: Artistic-2.0
 Encoding: UTF-8

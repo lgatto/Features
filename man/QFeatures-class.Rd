@@ -11,6 +11,7 @@
 \alias{[,QFeatures,character,ANY,ANY-method}
 \alias{rowDataNames}
 \alias{selectRowData}
+\alias{plot.QFeatures}
 \alias{rowData,QFeatures-method}
 \alias{rowData<-,QFeatures,DataFrameList-method}
 \alias{rowData<-,QFeatures,ANY-method}
@@ -20,6 +21,8 @@
 \title{Quantitative MS QFeatures}
 \usage{
 \S4method{show}{QFeatures}(object)
+
+\method{plot}{QFeatures}(x, interactive = FALSE, ...)
 
 \S4method{[}{QFeatures,ANY,ANY,ANY}(x, i, j, ..., drop = TRUE)
 
@@ -43,22 +46,28 @@ rowDataNames(x)
 
 longFormat(object, colvars = NULL, rowvars = NULL, index = 1L)
 
-QFeatures(..., assayLinks = NULL)
-
 addAssay(x, y, name = "newAssay", assayLinks = AssayLinks(names = name))
+
+QFeatures(..., assayLinks = NULL)
 }
 \arguments{
-\item{object}{An instance of class \code{QFeatures}.}
+\item{object}{An instance of class \link{QFeatures}.}
 
 \item{x}{An instance of class \link{QFeatures}.}
+
+\item{interactive}{A \code{logical(1)}. If \code{TRUE}, an interactive graph
+is generated using \code{plotly}. Else, a static plot using \code{igraph}
+is generated. We recommend interactive exploration when the
+\code{QFeatures} object contains more than 50 assays.}
+
+\item{...}{See \code{MultiAssayExperiment} for details. For \code{plot},
+further arguments passed to \code{igraph::plot.igraph}.}
 
 \item{i}{\code{character()}, \code{integer()}, \code{logical()} or \code{GRanges()}
 object for subsetting by rows.}
 
 \item{j}{\code{character()}, \code{logical()}, or \code{numeric()} vector for
 subsetting by \code{colData} rows.}
-
-\item{...}{See \code{MultiAssayExperiment} for details.}
 
 \item{drop}{logical (default \code{TRUE}) whether to drop empty assay
 elements in the \code{ExperimentList}.}
@@ -83,12 +92,12 @@ objects. A vector input is supported in the case that the
 \code{SummarizedExperiment} object(s) has more than one assay
 (default \code{1L})}
 
-\item{assayLinks}{An optional \link{AssayLinks}.}
-
 \item{y}{A single assay or a \emph{named} list of assays.}
 
 \item{name}{A \code{character(1)} naming the single assay (default is
 \code{"newAssay"}). Ignored if \code{y} is a list of assays.}
+
+\item{assayLinks}{An optional \link{AssayLinks} object.}
 }
 \value{
 See individual method description for the return value.

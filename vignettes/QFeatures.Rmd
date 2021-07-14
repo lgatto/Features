@@ -254,34 +254,7 @@ rowData(hl)[["proteins"]]
 Note that you can also replace an existing column in the `rowData` by
 naming the column name in the `DataFrame` after the column to replace.
 
-The `QFeatures` package also provides the `longFormat` function that 
-converts a `QFeatures` object into a long table. Long tables are very
-useful when using `ggplot2` for data visualization. For instance, 
-suppose we want to visualize the quantitation data (present in the
-assays) with respect to the number of aggregated features (present in
-the `rowData` of the assays), for peptide and protein separately 
-(present in different assays) and for each acquisition tag separately
-(present in the `colData`). This can all be plotted at once in a few lines of 
-code.
-
-```{r}
-lf <- longFormat(hl[, , c("peptides", "proteins")],
-                 rowvars = ".n",
-                 colvars = "tag")
-library("ggplot2")
-ggplot(data.frame(lf)) +
-    aes(x = .n, 
-        y = value) +
-    geom_point() +
-    facet_grid(assay ~ tag)
-```
-
-`longFormat` allows to retrieve and combine all available data from a
-`Qfeatures` object. We will provide another more useful example below.
-
-
 # Subsetting
-
 
 One particularity of the `QFeatures` infrastructure is that the
 features of the constitutive assays are linked through an aggregative
@@ -302,13 +275,14 @@ stat3
 ```
 
 We can easily visualise this new *QFeatures* object using `ggplot2`
-once converted into a `data.frame`.
+once converted into a `data.frame`. See the visualization vignette for
+more details about data exploration from a `QFeatures` object. 
 
 ```{r plotstat3}
 stat3_df <- data.frame(longFormat(stat3))
 stat3_df$assay <- factor(stat3_df$assay,
                         levels = c("psms", "peptides", "proteins"))
-
+library("ggplot2")
 ggplot(data = stat3_df,
        aes(x = colname,
            y = value,
@@ -372,30 +346,6 @@ hl %>%
 ```
 
 to reproduce the line plot.
-
-Finally, a simply `shiny` app allows to explore and visualise the
-respective assays of a `QFeatures` object.
-
-```{r display, eval = FALSE}
-display(stat)
-```
-
-```{r heatmapdisplay, results='markup', fig.cap="`QFeatures` interactive interface: heatmap of the peptide assay data.", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
-knitr::include_graphics("./figs/display_hmap.png", error = FALSE)
-```
-
-```{r assaydisplay, results='markup', fig.cap="`QFeatures` interactive interface: quantitative peptide assay data.", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
-knitr::include_graphics("./figs/display_assay.png", error = FALSE)
-```
-```{r rowdatadisplay, results='markup', fig.cap="`QFeatures` interactive interface: peptide assay row data", echo=FALSE, out.width='100%', fig.align='center', fig.wide = TRUE}
-knitr::include_graphics("./figs/display_rowdata.png", error = FALSE)
-```
-
-A dropdown menu in the side bar allows the user to select an assay of
-interest, which can then be visualised as a heatmap (figure
-\@ref(fig:heatmapdisplay)), as a quantitative table (figure
-\@ref(fig:assaydisplay)) or a row data table (figure
-\@ref(fig:rowdatadisplay)).
 
 # Filtering
 

@@ -171,6 +171,18 @@ test_that("renaming", {
                  regexp = "is duplicated$")
 })
 
+## This does not seem to work when runing R CMD check...
+# test_that("plotting", {
+#     data(feat2)
+#     feat2 <- joinAssays(feat2, i = 1:3)
+#     feat2 <- aggregateFeatures(feat2, 4, "Prot", name = "proteins")
+#     ## Plot QFeautres with interactive = FALSE
+#     ## expect_doppelganger creates a snapshot and compares to a test 
+#     ## snapshot in /_snaps/
+#     set.seed(1234)
+#     vdiffr::expect_doppelganger("qFeatures-plot", plot(feat2, interactive = FALSE))
+# })
+
 test_that("assays must have unique rownames", {
     hlpsms <- hlpsms[1:10, ]
     ft1 <- readQFeatures(hlpsms, ecol = 1:10, name = "psms", fname = "Sequence")

@@ -119,8 +119,9 @@ readSummarizedExperiment <- function(table, ecol, fnames, ...) {
 
 
 ##' @export
+##' 
 ##' @rdname QFeatures-class
-##' @param ... See `MultiAssayExperiment` for details.
+##' 
 ##' @param assayLinks An optional [AssayLinks] object.
 QFeatures <- function(..., assayLinks = NULL) {
     ans <- MultiAssayExperiment(...)
@@ -137,36 +138,3 @@ QFeatures <- function(..., assayLinks = NULL) {
         assayLinks = assayLinks)
 }
 
-
-
-##' @param x An instance of class [QFeatures].
-##' @param y A single assay or a *named* list of assays.
-##' @param name A `character(1)` naming the single assay (default is
-##'     `"newAssay"`). Ignored if `y` is a list of assays.
-##' @param assayLinks An optional [AssayLinks].
-##'
-##' @md
-##'
-##' @rdname QFeatures-class
-##'
-##' @export
-addAssay <- function(x,
-                     y,
-                     name = "newAssay",
-                     assayLinks = AssayLinks(names = name)) {
-    stopifnot(inherits(x, "QFeatures"))
-    el0 <- x@ExperimentList@listData
-    if (is.list(y)) el1 <- y
-    else el1 <- structure(list(y), .Names = name[1])
-    el <- ExperimentList(c(el0, el1))
-    smap <- MultiAssayExperiment:::.sampleMapFromData(colData(x), el)
-    if (inherits(assayLinks, "AssayLink"))
-        assayLinks <- AssayLinks(assayLinks)
-    new("QFeatures",
-        ExperimentList = el,
-        colData = colData(x),
-        sampleMap = smap,
-        metadata = metadata(x),
-        assayLinks = append(x@assayLinks,
-                            assayLinks))
-}
